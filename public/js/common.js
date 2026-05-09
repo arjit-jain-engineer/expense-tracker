@@ -60,20 +60,36 @@ function toast(message, type = 'success') {
     error: 'bg-rose-600',
     info: 'bg-slate-700'
   };
-  const container = document.getElementById('toast-container');
-  if(!container) return;
+
+  const durations = {
+    success: 5000,
+    info: 6000,
+    error: 10000
+  };
+
+  let container = document.getElementById('toast-container');
+
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'fixed top-6 right-6 z-[99999] flex flex-col gap-3';
+    document.body.appendChild(container);
+  }
+
+  container.style.zIndex = '99999';
 
   const el = document.createElement('div');
-  el.className = `${colors[type]} text-white px-5 py-3 rounded-xl shadow-2xl font-medium animate-slide-in mb-2`;
+  el.className = `${colors[type]} text-white px-5 py-4 rounded-2xl shadow-2xl font-medium animate-slide-in mb-2 max-w-sm break-words`;
   el.textContent = message;
+
   container.appendChild(el);
-  
+
   setTimeout(() => {
     el.style.opacity = '0';
     el.style.transform = 'translateY(-10px)';
-    el.style.transition = '0.3s';
+    el.style.transition = '0.3s ease';
     setTimeout(() => el.remove(), 300);
-  }, 3000);
+  }, durations[type] || 5000);
 }
 
 // ---- Currency formatter -----

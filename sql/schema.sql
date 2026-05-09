@@ -1,7 +1,10 @@
 -- ==============================================================
--- PAISA EXPENSE TRACKER — FULL DB SETUP (FIXED)
+-- PAISA EXPENSE TRACKER — FULL DB SETUP (FINAL / RECURSION FIXED)
 -- Copy-paste into Supabase SQL Editor and Run
 -- ==============================================================
+
+-- ============= EXTENSIONS =============
+create extension if not exists pgcrypto;
 
 -- ============= TABLES =============
 
@@ -85,6 +88,7 @@ create index if not exists idx_group_expenses_group on public.group_expenses(gro
 create index if not exists idx_expense_splits_user on public.expense_splits(user_id);
 create index if not exists idx_group_members_user on public.group_members(user_id);
 create index if not exists idx_group_members_group on public.group_members(group_id);
+create index if not exists idx_settlements_group on public.settlements(group_id);
 
 -- ============= AUTO-CREATE PROFILE TRIGGER =============
 
@@ -105,7 +109,8 @@ begin
             split_part(new.email, '@', 1)
         ),
         new.raw_user_meta_data->>'avatar_url'
-    );
+    )
+    on conflict (id) do nothing;
 
     insert into public.categories (user_id, name, icon, color) values
         (new.id, 'Food', '🍔', '#f59e0b'),
@@ -113,7 +118,8 @@ begin
         (new.id, 'Shopping', '🛍️', '#ec4899'),
         (new.id, 'Bills', '📄', '#ef4444'),
         (new.id, 'Entertainment', '🎬', '#8b5cf6'),
-        (new.id, 'Other', '💸', '#6b7280');
+        (new.id, 'Other', '💸', '#6b7280')
+    on conflict (user_id, name) do nothing;
 
     return new;
 end;
@@ -123,6 +129,42 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user();
+
+-- ============= HELPER FUNCTIONS FOR RLS =============
+
+drop function if exists public.is_group_member(uuid);
+drop function if exists public.is_group_creator(uuid);
+
+create or replace function public.is_group_member(p_group_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+    select exists (
+        select 1
+        from public.group_members gm
+        where gm.group_id = p_group_id
+          and gm.user_id = auth.uid()
+    );
+$$;
+
+create or replace function public.is_group_creator(p_group_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+    select exists (
+        select 1
+        from public.groups g
+        where g.id = p_group_id
+          and g.created_by = auth.uid()
+    );
+$$;
+
+grant execute on function public.is_group_member(uuid) to authenticated;
+grant execute on function public.is_group_creator(uuid) to authenticated;
 
 -- ============= ROW LEVEL SECURITY =============
 
@@ -136,7 +178,6 @@ alter table public.expense_splits enable row level security;
 alter table public.settlements enable row level security;
 
 -- ============= GRANTS =============
--- These are needed along with RLS policies.
 
 grant select, insert, update, delete on public.profiles to authenticated;
 grant select, insert, update, delete on public.categories to authenticated;
@@ -147,222 +188,203 @@ grant select, insert, update, delete on public.group_expenses to authenticated;
 grant select, insert, update, delete on public.expense_splits to authenticated;
 grant select, insert, update, delete on public.settlements to authenticated;
 
+-- ============= DROP OLD POLICIES =============
+
+drop policy if exists "Profiles viewable by authenticated" on public.profiles;
+drop policy if exists "Users can update own profile" on public.profiles;
+
+drop policy if exists "Own categories select" on public.categories;
+drop policy if exists "Own categories insert" on public.categories;
+drop policy if exists "Own categories update" on public.categories;
+drop policy if exists "Own categories delete" on public.categories;
+
+drop policy if exists "Own expenses select" on public.expenses;
+drop policy if exists "Own expenses insert" on public.expenses;
+drop policy if exists "Own expenses update" on public.expenses;
+drop policy if exists "Own expenses delete" on public.expenses;
+
+drop policy if exists "View groups where member" on public.groups;
+drop policy if exists "Create groups" on public.groups;
+drop policy if exists "Group creator can update" on public.groups;
+drop policy if exists "Group creator can delete" on public.groups;
+
+drop policy if exists "View members of own groups" on public.group_members;
+drop policy if exists "Group creator can add members" on public.group_members;
+drop policy if exists "Remove members - creator or self" on public.group_members;
+
+drop policy if exists "View group expenses if member" on public.group_expenses;
+drop policy if exists "Add group expenses if member" on public.group_expenses;
+drop policy if exists "Update own group expenses" on public.group_expenses;
+drop policy if exists "Delete own group expenses" on public.group_expenses;
+
+drop policy if exists "View splits of group expenses" on public.expense_splits;
+drop policy if exists "Manage splits if expense payer" on public.expense_splits;
+
+drop policy if exists "View settlements of own groups" on public.settlements;
+drop policy if exists "Add settlements where involved" on public.settlements;
+
 -- ============= POLICIES =============
 
 -- PROFILES
-drop policy if exists "Profiles viewable by authenticated" on public.profiles;
 create policy "Profiles viewable by authenticated"
 on public.profiles
 for select
 to authenticated
 using (true);
 
-drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"
 on public.profiles
 for update
 to authenticated
-using ((select auth.uid()) = id)
-with check ((select auth.uid()) = id);
+using (auth.uid() = id)
+with check (auth.uid() = id);
 
 -- CATEGORIES
-drop policy if exists "Own categories select" on public.categories;
 create policy "Own categories select"
 on public.categories
 for select
 to authenticated
-using ((select auth.uid()) = user_id);
+using (auth.uid() = user_id);
 
-drop policy if exists "Own categories insert" on public.categories;
 create policy "Own categories insert"
 on public.categories
 for insert
 to authenticated
-with check ((select auth.uid()) = user_id);
+with check (auth.uid() = user_id);
 
-drop policy if exists "Own categories update" on public.categories;
 create policy "Own categories update"
 on public.categories
 for update
 to authenticated
-using ((select auth.uid()) = user_id)
-with check ((select auth.uid()) = user_id);
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
 
-drop policy if exists "Own categories delete" on public.categories;
 create policy "Own categories delete"
 on public.categories
 for delete
 to authenticated
-using ((select auth.uid()) = user_id);
+using (auth.uid() = user_id);
 
 -- EXPENSES
-drop policy if exists "Own expenses select" on public.expenses;
 create policy "Own expenses select"
 on public.expenses
 for select
 to authenticated
-using ((select auth.uid()) = user_id);
+using (auth.uid() = user_id);
 
-drop policy if exists "Own expenses insert" on public.expenses;
 create policy "Own expenses insert"
 on public.expenses
 for insert
 to authenticated
-with check ((select auth.uid()) = user_id);
+with check (auth.uid() = user_id);
 
-drop policy if exists "Own expenses update" on public.expenses;
 create policy "Own expenses update"
 on public.expenses
 for update
 to authenticated
-using ((select auth.uid()) = user_id)
-with check ((select auth.uid()) = user_id);
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
 
-drop policy if exists "Own expenses delete" on public.expenses;
 create policy "Own expenses delete"
 on public.expenses
 for delete
 to authenticated
-using ((select auth.uid()) = user_id);
+using (auth.uid() = user_id);
 
 -- GROUPS
-drop policy if exists "View groups where member" on public.groups;
 create policy "View groups where member"
 on public.groups
 for select
 to authenticated
 using (
-    exists (
-        select 1
-        from public.group_members gm
-        where gm.group_id = groups.id
-          and gm.user_id = (select auth.uid())
-    )
-    or created_by = (select auth.uid())
+    created_by = auth.uid()
+    or public.is_group_member(id)
 );
 
-drop policy if exists "Create groups" on public.groups;
 create policy "Create groups"
 on public.groups
 for insert
 to authenticated
-with check ((select auth.uid()) = created_by);
+with check (auth.uid() = created_by);
 
-drop policy if exists "Group creator can update" on public.groups;
 create policy "Group creator can update"
 on public.groups
 for update
 to authenticated
-using ((select auth.uid()) = created_by)
-with check ((select auth.uid()) = created_by);
+using (auth.uid() = created_by)
+with check (auth.uid() = created_by);
 
-drop policy if exists "Group creator can delete" on public.groups;
 create policy "Group creator can delete"
 on public.groups
 for delete
 to authenticated
-using ((select auth.uid()) = created_by);
+using (auth.uid() = created_by);
 
 -- GROUP MEMBERS
-drop policy if exists "View members of own groups" on public.group_members;
 create policy "View members of own groups"
 on public.group_members
 for select
 to authenticated
 using (
-    exists (
-        select 1
-        from public.groups g
-        where g.id = group_members.group_id
-          and (
-            g.created_by = (select auth.uid())
-            or exists (
-                select 1
-                from public.group_members gm2
-                where gm2.group_id = g.id
-                  and gm2.user_id = (select auth.uid())
-            )
-          )
-    )
+    user_id = auth.uid()
+    or public.is_group_creator(group_id)
+    or public.is_group_member(group_id)
 );
 
-drop policy if exists "Group creator can add members" on public.group_members;
 create policy "Group creator can add members"
 on public.group_members
 for insert
 to authenticated
 with check (
-    exists (
-        select 1
-        from public.groups g
-        where g.id = group_members.group_id
-          and g.created_by = (select auth.uid())
-    )
-    or (select auth.uid()) = user_id
+    user_id = auth.uid()
+    or public.is_group_creator(group_id)
 );
 
-drop policy if exists "Remove members - creator or self" on public.group_members;
 create policy "Remove members - creator or self"
 on public.group_members
 for delete
 to authenticated
 using (
-    (select auth.uid()) = user_id
-    or exists (
-        select 1
-        from public.groups g
-        where g.id = group_members.group_id
-          and g.created_by = (select auth.uid())
-    )
+    user_id = auth.uid()
+    or public.is_group_creator(group_id)
 );
 
 -- GROUP EXPENSES
-drop policy if exists "View group expenses if member" on public.group_expenses;
 create policy "View group expenses if member"
 on public.group_expenses
 for select
 to authenticated
 using (
-    exists (
-        select 1
-        from public.group_members gm
-        where gm.group_id = group_expenses.group_id
-          and gm.user_id = (select auth.uid())
-    )
+    public.is_group_member(group_id)
+    or public.is_group_creator(group_id)
 );
 
-drop policy if exists "Add group expenses if member" on public.group_expenses;
 create policy "Add group expenses if member"
 on public.group_expenses
 for insert
 to authenticated
 with check (
-    (select auth.uid()) = paid_by
-    and exists (
-        select 1
-        from public.group_members gm
-        where gm.group_id = group_expenses.group_id
-          and gm.user_id = (select auth.uid())
+    auth.uid() = paid_by
+    and (
+        public.is_group_member(group_id)
+        or public.is_group_creator(group_id)
     )
 );
 
-drop policy if exists "Update own group expenses" on public.group_expenses;
 create policy "Update own group expenses"
 on public.group_expenses
 for update
 to authenticated
-using ((select auth.uid()) = paid_by)
-with check ((select auth.uid()) = paid_by);
+using (auth.uid() = paid_by)
+with check (auth.uid() = paid_by);
 
-drop policy if exists "Delete own group expenses" on public.group_expenses;
 create policy "Delete own group expenses"
 on public.group_expenses
 for delete
 to authenticated
-using ((select auth.uid()) = paid_by);
+using (auth.uid() = paid_by);
 
 -- EXPENSE SPLITS
-drop policy if exists "View splits of group expenses" on public.expense_splits;
 create policy "View splits of group expenses"
 on public.expense_splits
 for select
@@ -371,13 +393,14 @@ using (
     exists (
         select 1
         from public.group_expenses ge
-        join public.group_members gm on gm.group_id = ge.group_id
         where ge.id = expense_splits.group_expense_id
-          and gm.user_id = (select auth.uid())
+          and (
+              public.is_group_member(ge.group_id)
+              or public.is_group_creator(ge.group_id)
+          )
     )
 );
 
-drop policy if exists "Manage splits if expense payer" on public.expense_splits;
 create policy "Manage splits if expense payer"
 on public.expense_splits
 for all
@@ -387,7 +410,7 @@ using (
         select 1
         from public.group_expenses ge
         where ge.id = expense_splits.group_expense_id
-          and ge.paid_by = (select auth.uid())
+          and ge.paid_by = auth.uid()
     )
 )
 with check (
@@ -395,43 +418,35 @@ with check (
         select 1
         from public.group_expenses ge
         where ge.id = expense_splits.group_expense_id
-          and ge.paid_by = (select auth.uid())
+          and ge.paid_by = auth.uid()
     )
 );
 
 -- SETTLEMENTS
-drop policy if exists "View settlements of own groups" on public.settlements;
 create policy "View settlements of own groups"
 on public.settlements
 for select
 to authenticated
 using (
-    exists (
-        select 1
-        from public.group_members gm
-        where gm.group_id = settlements.group_id
-          and gm.user_id = (select auth.uid())
-    )
+    public.is_group_member(group_id)
+    or public.is_group_creator(group_id)
 );
 
-drop policy if exists "Add settlements where involved" on public.settlements;
 create policy "Add settlements where involved"
 on public.settlements
 for insert
 to authenticated
 with check (
-    ((select auth.uid()) = from_user or (select auth.uid()) = to_user)
-    and exists (
-        select 1
-        from public.group_members gm
-        where gm.group_id = settlements.group_id
-          and gm.user_id = (select auth.uid())
+    (auth.uid() = from_user or auth.uid() = to_user)
+    and (
+        public.is_group_member(group_id)
+        or public.is_group_creator(group_id)
     )
 );
 
 -- ============= DONE =============
 -- After running:
--- 1) Refresh the app
--- 2) Re-login
--- 3) Check categories dropdown
--- 4) Try Add Expense
+-- 1) Hard refresh app
+-- 2) Logout and login again
+-- 3) Open Groups page
+-- 4) Create group / add member / add expense
