@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in · Paisa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="toast-container" class="fixed top-6 right-6 z-50 flex flex-col gap-2"></div>
+
+  <div class="min-h-screen flex">
+    <!-- Left: brand panel -->
+    <div class="hidden lg:flex lg:w-1/2 bg-stone-900 text-stone-100 p-12 flex-col justify-between relative overflow-hidden">
+      <div class="absolute inset-0 opacity-30" style="background-image: radial-gradient(circle at 30% 30%, rgba(217,119,6,0.4) 0, transparent 50%), radial-gradient(circle at 70% 70%, rgba(225,29,72,0.3) 0, transparent 50%);"></div>
+      <div class="relative">
+        <div class="flex items-center gap-2 mb-1">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center font-bold text-lg">₹</div>
+          <span class="font-display text-2xl font-semibold">Paisa</span>
+        </div>
+      </div>
+      <div class="relative">
+        <h1 class="font-display text-5xl xl:text-6xl font-semibold leading-[1.05] tracking-tight">
+          Track your spending.<br/>
+          <span class="italic text-amber-300">Settle</span> with friends.<br/>
+          <span class="text-stone-400">Forget no rupee.</span>
+        </h1>
+        <p class="mt-6 text-stone-400 max-w-md text-lg">
+          Personal expenses, group splits, and auto-calculated balances — all in one place.
+        </p>
+      </div>
+      <div class="relative text-stone-500 text-sm">
+        Built with Supabase · Hosted on Vercel
+      </div>
+    </div>
+
+    <!-- Right: form -->
+    <div class="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12">
+      <div class="w-full max-w-sm">
+        <div class="lg:hidden flex items-center gap-2 mb-8">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center font-bold text-white text-lg">₹</div>
+          <span class="font-display text-2xl font-semibold">Paisa</span>
+        </div>
+
+        <h2 class="font-display text-3xl font-semibold mb-2" id="form-title">Welcome back</h2>
+        <p class="text-stone-500 mb-8" id="form-subtitle">Sign in to continue tracking</p>
+
+        <!-- Google -->
+        <button id="google-btn" class="w-full flex items-center justify-center gap-3 bg-white border border-stone-200 hover:bg-stone-50 transition py-3 rounded-xl font-medium shadow-sm">
+          <svg width="18" height="18" viewBox="0 0 18 18">
+            <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+            <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+            <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+            <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+          </svg>
+          Continue with Google
+        </button>
+
+        <div class="my-6 flex items-center gap-3">
+          <div class="flex-1 h-px bg-stone-200"></div>
+          <span class="text-xs text-stone-400 uppercase tracking-wider">or</span>
+          <div class="flex-1 h-px bg-stone-200"></div>
+        </div>
+
+        <!-- Email form -->
+        <div id="name-field" class="hidden mb-4">
+          <label>Full name</label>
+          <input id="name-input" type="text" class="input" placeholder="Aarav Sharma" />
+        </div>
+        <div class="mb-4">
+          <label>Email</label>
+          <input id="email-input" type="email" class="input" placeholder="you@example.com" />
+        </div>
+        <div class="mb-6">
+          <label>Password</label>
+          <input id="password-input" type="password" class="input" placeholder="••••••••" />
+        </div>
+
+        <button id="submit-btn" class="btn-primary w-full justify-center">
+          <span id="submit-text">Sign in</span>
+        </button>
+
+        <p class="text-center text-stone-500 text-sm mt-6">
+          <span id="toggle-text">Don't have an account?</span>
+          <button id="toggle-btn" class="text-amber-700 font-semibold hover:underline ml-1">Sign up</button>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    let mode = 'signin';
+
+    document.getElementById('toggle-btn').addEventListener('click', () => {
+      mode = mode === 'signin' ? 'signup' : 'signin';
+      const isSignup = mode === 'signup';
+      document.getElementById('form-title').textContent = isSignup ? 'Create account' : 'Welcome back';
+      document.getElementById('form-subtitle').textContent = isSignup ? 'Start tracking your expenses' : 'Sign in to continue tracking';
+      document.getElementById('submit-text').textContent = isSignup ? 'Create account' : 'Sign in';
+      document.getElementById('toggle-text').textContent = isSignup ? 'Already have an account?' : "Don't have an account?";
+      document.getElementById('toggle-btn').textContent = isSignup ? 'Sign in' : 'Sign up';
+      document.getElementById('name-field').classList.toggle('hidden', !isSignup);
+    });
+
+    document.getElementById('submit-btn').addEventListener('click', async () => {
+      const email = document.getElementById('email-input').value.trim();
+      const password = document.getElementById('password-input').value;
+      const name = document.getElementById('name-input').value.trim();
+
+      if (!email || !password) return toast('Email aur password chahiye', 'error');
+      if (mode === 'signup' && !name) return toast('Naam bhi daal de', 'error');
+
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      document.getElementById('submit-text').textContent = 'Please wait...';
+
+      try {
+        if (mode === 'signup') {
+          const { error } = await sb.auth.signUp({
+            email, password,
+            options: { data: { full_name: name } }
+          });
+          if (error) throw error;
+          toast('Account banaya! Email confirm krne ke baad login krna.', 'success');
+        } else {
+          const { error } = await sb.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+          window.location.href = 'index.html';
+        }
+      } catch (e) {
+        toast(e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        document.getElementById('submit-text').textContent = mode === 'signup' ? 'Create account' : 'Sign in';
+      }
+    });
+
+    document.getElementById('google-btn').addEventListener('click', async () => {
+      const { error } = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin + '/index.html' }
+      });
+      if (error) toast(error.message, 'error');
+    });
+
+    // Already logged in? Redirect.
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session) window.location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>

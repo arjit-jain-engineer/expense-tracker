@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Groups · Paisa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="toast-container" class="fixed top-6 right-6 z-50 flex flex-col gap-2"></div>
+
+  <nav class="border-b border-stone-200 bg-white/70 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-8">
+        <a href="index.html" class="flex items-center gap-2">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center font-bold text-white">₹</div>
+          <span class="font-display text-xl font-semibold">Paisa</span>
+        </a>
+        <div class="hidden md:flex items-center gap-1">
+          <a href="index.html" class="tab">Personal</a>
+          <a href="groups.html" class="tab active">Groups</a>
+        </div>
+      </div>
+      <div id="user-nav"></div>
+    </div>
+    <div class="md:hidden flex justify-center gap-1 pb-2">
+      <a href="index.html" class="tab">Personal</a>
+      <a href="groups.html" class="tab active">Groups</a>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8 animate-fade-up">
+      <div>
+        <p class="text-stone-500 text-sm uppercase tracking-wider mb-1">Groups</p>
+        <h1 class="font-display text-4xl sm:text-5xl font-semibold tracking-tight">Split with <span class="italic text-amber-700">friends</span></h1>
+        <p class="text-stone-500 mt-2">Trips, dinners, flatmates — kahin bhi paisa share kiya, yaha track ho.</p>
+      </div>
+      <button onclick="openModal('create-group-modal')" class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New group
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div class="card p-5 animate-fade-up stagger-1">
+        <p class="text-stone-500 text-xs uppercase tracking-wider mb-1">You owe</p>
+        <p class="font-display text-3xl font-semibold text-rose-600" id="total-owe">₹0</p>
+      </div>
+      <div class="card p-5 animate-fade-up stagger-2">
+        <p class="text-stone-500 text-xs uppercase tracking-wider mb-1">You are owed</p>
+        <p class="font-display text-3xl font-semibold text-emerald-600" id="total-owed">₹0</p>
+      </div>
+      <div class="card p-5 animate-fade-up stagger-3">
+        <p class="text-stone-500 text-xs uppercase tracking-wider mb-1">Net balance</p>
+        <p class="font-display text-3xl font-semibold" id="total-net">₹0</p>
+      </div>
+    </div>
+
+    <div id="groups-grid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div class="px-6 py-12 text-center text-stone-400 col-span-full">Loading...</div>
+    </div>
+  </main>
+  <div id="profile-modal" class="modal-backdrop hidden">
+    <div class="modal-content max-w-md w-full rounded-[28px] border border-white/60 shadow-2xl p-0 overflow-hidden bg-white">
+      <div class="px-6 py-5 border-b border-stone-100 bg-gradient-to-b from-white to-stone-50/70">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.24em] text-stone-400 mb-1">Account</p>
+            <h3 class="font-display text-2xl font-semibold text-stone-900">Profile</h3>
+          </div>
+          <button onclick="closeModal('profile-modal')" class="w-9 h-9 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 transition flex items-center justify-center" aria-label="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="px-6 py-6">
+        <div class="flex items-center gap-4">
+          <div id="profile-avatar" class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 text-white flex items-center justify-center font-bold text-xl shadow-lg overflow-hidden ring-4 ring-white"></div>
+          <div class="min-w-0">
+            <p id="profile-name" class="font-semibold text-stone-900 text-lg leading-tight"></p>
+            <p id="profile-email" class="text-stone-500 text-sm mt-1 truncate"></p>
+          </div>
+        </div>
+
+        <div class="mt-6 space-y-3">
+          <div class="rounded-2xl bg-stone-50 border border-stone-100 px-4 py-4">
+            <p class="text-xs uppercase tracking-[0.18em] text-stone-400 mb-1">Status</p>
+            <p class="font-medium text-stone-900">Signed in</p>
+          </div>
+
+          <div class="rounded-2xl bg-stone-50 border border-stone-100 px-4 py-4">
+            <p class="text-xs uppercase tracking-[0.18em] text-stone-400 mb-3">Actions</p>
+            <button onclick="logout()" class="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 transition shadow-sm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-5 border-t border-stone-100 bg-stone-50/80 flex justify-end">
+        <button onclick="closeModal('profile-modal')" class="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100 transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+  <div id="create-group-modal" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <h3 class="font-display text-2xl font-semibold mb-1">Create group</h3>
+      <p class="text-stone-500 text-sm mb-5">A group can be a trip, flat, or anything you split costs on</p>
+      <div class="space-y-4">
+        <div>
+          <label>Group name</label>
+          <input id="group-name" class="input" placeholder="Goa Trip 2025" />
+        </div>
+        <div>
+          <label>Description (optional)</label>
+          <input id="group-desc" class="input" placeholder="3-day weekend trip" />
+        </div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button onclick="closeModal('create-group-modal')" class="btn-ghost flex-1">Cancel</button>
+        <button id="save-group-btn" class="btn-primary flex-1 justify-center">Create group</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    let me = null;
+    let myGroups = [];
+
+    async function init() {
+      try {
+        me = await requireAuth();
+        if (!me) return;
+
+        await renderUserNav();
+
+        document.getElementById('save-group-btn').addEventListener('click', createGroup);
+
+        await loadGroups();
+      } catch (err) {
+        console.error('init error:', err);
+        toast(`Init failed: ${err.message}`, 'error');
+        document.getElementById('groups-grid').innerHTML = `
+          <div class="col-span-full card p-12 text-center text-rose-600">
+            Failed to initialize page<br>
+            <span class="text-sm text-stone-500">${err.message}</span>
+          </div>
+        `;
+      }
+    }
+
+    async function loadGroups() {
+      const grid = document.getElementById('groups-grid');
+      grid.innerHTML = `<div class="px-6 py-12 text-center text-stone-400 col-span-full">Loading...</div>`;
+
+      const { data: memberships, error } = await sb
+        .from('group_members')
+        .select(`
+          group_id,
+          groups (
+            id,
+            name,
+            description,
+            created_at,
+            created_by
+          )
+        `)
+        .eq('user_id', me.id);
+
+      if (error) {
+        console.error('loadGroups error:', error);
+        toast(error.message, 'error');
+        grid.innerHTML = `
+          <div class="col-span-full card p-12 text-center">
+            <div class="text-5xl mb-3">⚠️</div>
+            <p class="font-display text-2xl font-semibold mb-2 text-rose-600">Groups load nahi hue</p>
+            <p class="text-stone-500">${error.message}</p>
+          </div>
+        `;
+        document.getElementById('total-owe').textContent = fmtCurrency(0);
+        document.getElementById('total-owed').textContent = fmtCurrency(0);
+        document.getElementById('total-net').textContent = fmtCurrency(0);
+        return;
+      }
+
+      myGroups = (memberships || []).map(m => m.groups).filter(Boolean);
+
+      let totalOwe = 0;
+      let totalOwed = 0;
+
+      const groupsWithBalances = await Promise.all(
+        myGroups.map(async (g) => {
+          const balance = await calculateMyBalanceInGroup(g.id);
+          if (balance < 0) totalOwe += -balance;
+          else totalOwed += balance;
+          return { ...g, balance };
+        })
+      );
+
+      document.getElementById('total-owe').textContent = fmtCurrency(totalOwe);
+      document.getElementById('total-owed').textContent = fmtCurrency(totalOwed);
+
+      const net = totalOwed - totalOwe;
+      const netEl = document.getElementById('total-net');
+      netEl.textContent = `${net >= 0 ? '+' : '-'}${fmtCurrency(Math.abs(net))}`;
+      netEl.className = 'font-display text-3xl font-semibold ' + (net >= 0 ? 'text-emerald-600' : 'text-rose-600');
+
+      renderGroups(groupsWithBalances);
+    }
+
+    async function calculateMyBalanceInGroup(groupId) {
+      try {
+        const [
+          { data: expenses, error: expErr },
+          { data: splits, error: splitErr },
+          { data: settlements, error: settleErr }
+        ] = await Promise.all([
+          sb.from('group_expenses')
+            .select('amount, paid_by')
+            .eq('group_id', groupId),
+
+          sb.from('expense_splits')
+            .select('share_amount, group_expenses!inner(group_id)')
+            .eq('user_id', me.id)
+            .eq('group_expenses.group_id', groupId),
+
+          sb.from('settlements')
+            .select('amount, from_user, to_user')
+            .eq('group_id', groupId)
+        ]);
+
+        if (expErr) {
+          console.error('calculate balance expenses error:', expErr);
+          toast(expErr.message, 'error');
+          return 0;
+        }
+
+        if (splitErr) {
+          console.error('calculate balance splits error:', splitErr);
+          toast(splitErr.message, 'error');
+          return 0;
+        }
+
+        if (settleErr) {
+          console.error('calculate balance settlements error:', settleErr);
+          toast(settleErr.message, 'error');
+          return 0;
+        }
+
+        const paidByMe = (expenses || [])
+          .filter(e => e.paid_by === me.id)
+          .reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+
+        const myShare = (splits || [])
+          .reduce((s, x) => s + parseFloat(x.share_amount || 0), 0);
+
+        const paidToMe = (settlements || [])
+          .filter(s => s.to_user === me.id)
+          .reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+
+        const paidByMeAsSettle = (settlements || [])
+          .filter(s => s.from_user === me.id)
+          .reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+
+        return (paidByMe - myShare) + (paidByMeAsSettle - paidToMe);
+      } catch (err) {
+        console.error('calculateMyBalanceInGroup fatal error:', err);
+        return 0;
+      }
+    }
+
+    function renderGroups(groups) {
+      const grid = document.getElementById('groups-grid');
+
+      if (!groups.length) {
+        grid.innerHTML = `
+          <div class="col-span-full card p-12 text-center">
+            <div class="text-5xl mb-3">👥</div>
+            <p class="font-display text-2xl font-semibold mb-2">No groups yet</p>
+            <p class="text-stone-500 mb-5">Create your first group to start splitting expenses</p>
+            <button onclick="openModal('create-group-modal')" class="btn-primary mx-auto">Create group</button>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = groups.map((g, i) => {
+        const bal = g.balance || 0;
+        const balText =
+          bal === 0
+            ? 'Settled up'
+            : (bal > 0 ? `You're owed ${fmtCurrency(bal)}` : `You owe ${fmtCurrency(-bal)}`);
+
+        const balColor =
+          bal === 0
+            ? 'text-stone-500'
+            : (bal > 0 ? 'text-emerald-600' : 'text-rose-600');
+
+        const initial = (g.name || '?')[0].toUpperCase();
+
+        const gradients = [
+          'from-amber-400 to-rose-500',
+          'from-blue-400 to-indigo-500',
+          'from-emerald-400 to-teal-500',
+          'from-purple-400 to-pink-500',
+          'from-orange-400 to-red-500',
+          'from-cyan-400 to-blue-500'
+        ];
+
+        const grad = gradients[i % gradients.length];
+
+        return `
+          <a href="group.html?id=${g.id}" class="card p-6 hover:shadow-lg transition cursor-pointer animate-fade-up block" style="animation-delay: ${i * 0.05}s; animation-fill-mode: backwards;">
+            <div class="flex items-start justify-between mb-4">
+              <div class="w-12 h-12 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-xl">
+                ${initial}
+              </div>
+              <span class="text-xs text-stone-400">${fmtDate(g.created_at)}</span>
+            </div>
+            <h3 class="font-display text-xl font-semibold mb-1">${g.name || 'Untitled group'}</h3>
+            <p class="text-stone-500 text-sm mb-4">${g.description || 'No description'}</p>
+            <p class="${balColor} font-medium text-sm">${balText}</p>
+          </a>
+        `;
+      }).join('');
+    }
+
+    async function createGroup() {
+      const name = document.getElementById('group-name').value.trim();
+      const description = document.getElementById('group-desc').value.trim();
+      const btn = document.getElementById('save-group-btn');
+
+      if (!name) return toast('Group ka naam daal', 'error');
+
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+
+      const { data: group, error } = await sb
+        .from('groups')
+        .insert({
+          name,
+          description: description || null,
+          created_by: me.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('createGroup error:', error);
+        btn.disabled = false;
+        btn.textContent = 'Create group';
+        return toast(error.message, 'error');
+      }
+
+      const { error: memberErr } = await sb
+        .from('group_members')
+        .insert({
+          group_id: group.id,
+          user_id: me.id
+        });
+
+      if (memberErr) {
+        console.error('createGroup member insert error:', memberErr);
+        btn.disabled = false;
+        btn.textContent = 'Create group';
+        return toast(memberErr.message, 'error');
+      }
+
+      toast('Group created!', 'success');
+      closeModal('create-group-modal');
+      document.getElementById('group-name').value = '';
+      document.getElementById('group-desc').value = '';
+      window.location.href = `group.html?id=${group.id}`;
+    }
+
+    init();
+  </script>
+</body>
+</html>

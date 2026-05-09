@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard · Paisa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="toast-container" class="fixed top-6 right-6 z-50 flex flex-col gap-2"></div>
+
+  <!-- NAV -->
+  <nav class="border-b border-stone-200 bg-white/70 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-8">
+        <a href="index.html" class="flex items-center gap-2">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center font-bold text-white">₹</div>
+          <span class="font-display text-xl font-semibold">Paisa</span>
+        </a>
+        <div class="hidden md:flex items-center gap-1">
+          <a href="index.html" class="tab active">Personal</a>
+          <a href="groups.html" class="tab">Groups</a>
+        </div>
+      </div>
+      <div id="user-nav"></div>
+    </div>
+    <div class="md:hidden flex justify-center gap-1 pb-2">
+      <a href="index.html" class="tab active">Personal</a>
+      <a href="groups.html" class="tab">Groups</a>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8 animate-fade-up">
+      <div>
+        <p class="text-stone-500 text-sm uppercase tracking-wider mb-1">Personal expenses</p>
+        <h1 class="font-display text-4xl sm:text-5xl font-semibold tracking-tight">Your spending, <span class="italic text-amber-700">at a glance</span></h1>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="exportCSV()" class="btn-ghost">
+          <svg width="16" height="16" class="inline -mt-1 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+        <button onclick="openModal('add-expense-modal')" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add expense
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div class="card p-5 animate-fade-up stagger-1">
+        <p class="text-stone-500 text-xs uppercase tracking-wider mb-1">This month</p>
+        <p class="font-display text-3xl font-semibold" id="stat-month">₹0</p>
+      </div>
+      <div class="card p-5 animate-fade-up stagger-2">
+        <p class="text-stone-500 text-xs uppercase tracking-wider mb-1">Last month</p>
+        <p class="font-display text-3xl font-semibold text-stone-600" id="stat-last-month">₹0</p>
+      </div>
+      <div class="card p-5 animate-fade-up stagger-3">
+        <p class="text-stone-500 text-xs uppercase tracking-wider mb-1">This year</p>
+        <p class="font-display text-3xl font-semibold" id="stat-year">₹0</p>
+      </div>
+      <div class="card p-5 animate-fade-up stagger-4">
+        <p class="text-stone-500 text-xs uppercase tracking-wider mb-1">Total entries</p>
+        <p class="font-display text-3xl font-semibold" id="stat-count">0</p>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid lg:grid-cols-3 gap-6 mb-8">
+      <div class="card p-6 lg:col-span-2 animate-fade-up">
+        <h3 class="font-semibold text-stone-700 mb-4">Last 6 months</h3>
+        <div class="h-64"><canvas id="chart-months"></canvas></div>
+      </div>
+      <div class="card p-6 animate-fade-up">
+        <h3 class="font-semibold text-stone-700 mb-4">By category</h3>
+        <div class="h-64"><canvas id="chart-categories"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Recent expenses -->
+    <div class="card overflow-hidden animate-fade-up">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-stone-200">
+        <h3 class="font-semibold text-stone-800">Recent expenses</h3>
+        <input id="search-input" placeholder="Search..." class="input max-w-xs" />
+      </div>
+      <div id="expenses-list" class="divide-y divide-stone-100">
+        <div class="px-6 py-12 text-center text-stone-400">Loading...</div>
+      </div>
+    </div>
+  </main>
+  <div id="profile-modal" class="modal-backdrop hidden">
+    <div class="modal-content max-w-md w-full rounded-[28px] border border-white/60 shadow-2xl p-0 overflow-hidden bg-white">
+      <div class="px-6 py-5 border-b border-stone-100 bg-gradient-to-b from-white to-stone-50/70">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[0.24em] text-stone-400 mb-1">Account</p>
+            <h3 class="font-display text-2xl font-semibold text-stone-900">Profile</h3>
+          </div>
+          <button onclick="closeModal('profile-modal')" class="w-9 h-9 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 transition flex items-center justify-center" aria-label="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="px-6 py-6">
+        <div class="flex items-center gap-4">
+          <div id="profile-avatar" class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 text-white flex items-center justify-center font-bold text-xl shadow-lg overflow-hidden ring-4 ring-white"></div>
+          <div class="min-w-0">
+            <p id="profile-name" class="font-semibold text-stone-900 text-lg leading-tight"></p>
+            <p id="profile-email" class="text-stone-500 text-sm mt-1 truncate"></p>
+          </div>
+        </div>
+
+        <div class="mt-6 space-y-3">
+          <div class="rounded-2xl bg-stone-50 border border-stone-100 px-4 py-4">
+            <p class="text-xs uppercase tracking-[0.18em] text-stone-400 mb-1">Status</p>
+            <p class="font-medium text-stone-900">Signed in</p>
+          </div>
+
+          <div class="rounded-2xl bg-stone-50 border border-stone-100 px-4 py-4">
+            <p class="text-xs uppercase tracking-[0.18em] text-stone-400 mb-3">Actions</p>
+            <button onclick="logout()" class="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 transition shadow-sm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-5 border-t border-stone-100 bg-stone-50/80 flex justify-end">
+        <button onclick="closeModal('profile-modal')" class="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100 transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- Add expense modal -->
+  <div id="add-expense-modal" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <h3 class="font-display text-2xl font-semibold mb-1">Add expense</h3>
+      <p class="text-stone-500 text-sm mb-5">Track where your paisa went</p>
+      <div class="space-y-4">
+        <div>
+          <label>Amount (₹)</label>
+          <input id="exp-amount" type="number" step="0.01" min="0" class="input" placeholder="0.00" />
+        </div>
+        <div>
+          <label>Description</label>
+          <input id="exp-desc" class="input" placeholder="Lunch at Burger King" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label>Category</label>
+            <select id="exp-category" class="input"></select>
+          </div>
+          <div>
+            <label>Date</label>
+            <input id="exp-date" type="date" class="input" />
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button onclick="closeModal('add-expense-modal')" class="btn-ghost flex-1">Cancel</button>
+        <button id="save-exp-btn" class="btn-primary flex-1 justify-center">Save expense</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    let me = null;
+    let categories = [];
+    let allExpenses = [];
+
+    async function init() {
+      try {
+        me = await requireAuth();
+        if (!me) return;
+
+        await renderUserNav();
+
+        document.getElementById('exp-date').valueAsDate = new Date();
+
+        document.getElementById('save-exp-btn').addEventListener('click', saveExpense);
+        document.getElementById('search-input').addEventListener('input', renderExpensesList);
+
+        await loadCategories();
+        await loadExpenses();
+      } catch (err) {
+        console.error('init error:', err);
+        toast(`Init failed: ${err.message}`, 'error');
+      }
+    }
+
+    async function loadCategories() {
+      const sel = document.getElementById('exp-category');
+      sel.innerHTML = `<option value="">Loading categories...</option>`;
+
+      const { data, error } = await sb
+        .from('categories')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('loadCategories error:', error);
+        sel.innerHTML = `<option value="">Failed to load categories</option>`;
+        toast(`Categories error: ${error.message}`, 'error');
+        categories = [];
+        return;
+      }
+
+      categories = data || [];
+
+      if (!categories.length) {
+        sel.innerHTML = `<option value="">No categories found</option>`;
+        return;
+      }
+
+      sel.innerHTML = `<option value="">Select category</option>` +
+        categories.map(c => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+    }
+
+    async function loadExpenses() {
+      const list = document.getElementById('expenses-list');
+      list.innerHTML = `<div class="px-6 py-12 text-center text-stone-400">Loading...</div>`;
+
+      const { data, error } = await sb
+        .from('expenses')
+        .select('*, categories(name, icon, color)')
+        .order('expense_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('loadExpenses error:', error);
+        list.innerHTML = `
+          <div class="px-6 py-12 text-center text-rose-500">
+            Failed to load expenses<br>
+            <span class="text-sm text-stone-500">${error.message}</span>
+          </div>
+        `;
+        toast(`Expenses error: ${error.message}`, 'error');
+        allExpenses = [];
+        return;
+      }
+
+      allExpenses = data || [];
+      renderStats();
+      renderCharts();
+      renderExpensesList();
+    }
+
+    function renderStats() {
+      const now = new Date();
+      const thisMonth = now.getMonth(), thisYear = now.getFullYear();
+      const lastMonthDate = new Date(thisYear, thisMonth - 1, 1);
+
+      let monthSum = 0, lastMonthSum = 0, yearSum = 0;
+      for (const e of allExpenses) {
+        const d = new Date(e.expense_date);
+        const amt = parseFloat(e.amount);
+        if (d.getFullYear() === thisYear) yearSum += amt;
+        if (d.getFullYear() === thisYear && d.getMonth() === thisMonth) monthSum += amt;
+        if (d.getFullYear() === lastMonthDate.getFullYear() && d.getMonth() === lastMonthDate.getMonth()) lastMonthSum += amt;
+      }
+      document.getElementById('stat-month').textContent = fmtCurrency(monthSum);
+      document.getElementById('stat-last-month').textContent = fmtCurrency(lastMonthSum);
+      document.getElementById('stat-year').textContent = fmtCurrency(yearSum);
+      document.getElementById('stat-count').textContent = allExpenses.length;
+    }
+
+    function renderCharts() {
+      // Last 6 months
+      const months = [];
+      const now = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('en-IN', { month: 'short' }), total: 0 });
+      }
+      for (const e of allExpenses) {
+        const d = new Date(e.expense_date);
+        const k = `${d.getFullYear()}-${d.getMonth()}`;
+        const m = months.find(x => x.key === k);
+        if (m) m.total += parseFloat(e.amount);
+      }
+      const ctx1 = document.getElementById('chart-months');
+      if (ctx1._chart) ctx1._chart.destroy();
+      ctx1._chart = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: months.map(m => m.label),
+          datasets: [{
+            data: months.map(m => m.total),
+            backgroundColor: '#d97706',
+            borderRadius: 8,
+            barThickness: 32
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { ticks: { callback: v => '₹' + v }, grid: { color: '#f5f5f4' } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+      // Categories pie
+      const catTotals = {};
+      for (const e of allExpenses) {
+        const cat = e.categories?.name || 'Other';
+        catTotals[cat] = (catTotals[cat] || 0) + parseFloat(e.amount);
+      }
+      const labels = Object.keys(catTotals);
+      const ctx2 = document.getElementById('chart-categories');
+      if (ctx2._chart) ctx2._chart.destroy();
+      ctx2._chart = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data: Object.values(catTotals),
+            backgroundColor: ['#d97706', '#e11d48', '#059669', '#3b82f6', '#8b5cf6', '#a8a29e', '#f59e0b', '#ec4899'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } }
+          }
+        }
+      });
+    }
+
+    function renderExpensesList() {
+      const q = document.getElementById('search-input').value.toLowerCase();
+      const filtered = allExpenses.filter(e =>
+        !q || (e.description || '').toLowerCase().includes(q) || (e.categories?.name || '').toLowerCase().includes(q)
+      );
+      const list = document.getElementById('expenses-list');
+      if (!filtered.length) {
+        list.innerHTML = `<div class="px-6 py-16 text-center text-stone-400">
+          <p class="text-lg">Abhi tak koi expense add nhi kiya</p>
+          <p class="text-sm mt-1">Click "Add expense" to start tracking</p>
+        </div>`;
+        return;
+      }
+      list.innerHTML = filtered.slice(0, 50).map(e => `
+        <div class="px-6 py-4 flex items-center gap-4 hover:bg-stone-50 transition">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl" style="background: ${e.categories?.color || '#6366f1'}20;">
+            ${e.categories?.icon || '💸'}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="font-medium text-stone-800 truncate">${e.description || 'Untitled'}</p>
+            <p class="text-xs text-stone-500">${e.categories?.name || 'Other'} · ${fmtDate(e.expense_date)}</p>
+          </div>
+          <p class="font-display text-lg font-semibold">${fmtCurrency(e.amount)}</p>
+          <button onclick="deleteExpense('${e.id}')" class="text-stone-400 hover:text-rose-600 p-2 transition" title="Delete">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    async function saveExpense() {
+      const amount = parseFloat(document.getElementById('exp-amount').value);
+      const description = document.getElementById('exp-desc').value.trim();
+      const category_id = document.getElementById('exp-category').value;
+      const expense_date = document.getElementById('exp-date').value;
+
+      if (!amount || amount <= 0) return toast('Valid amount daal', 'error');
+      if (!category_id) return toast('Category select karo', 'error');
+      if (!expense_date) return toast('Date select karo', 'error');
+
+      const btn = document.getElementById('save-exp-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      const { error } = await sb.from('expenses').insert({
+        user_id: me.id,
+        amount,
+        description,
+        category_id,
+        expense_date
+      });
+
+      btn.disabled = false;
+      btn.textContent = 'Save expense';
+
+      if (error) {
+        console.error('saveExpense error:', error);
+        return toast(error.message, 'error');
+      }
+
+      toast('Expense added!', 'success');
+      closeModal('add-expense-modal');
+      document.getElementById('exp-amount').value = '';
+      document.getElementById('exp-desc').value = '';
+      await loadExpenses();
+    }
+
+    async function deleteExpense(id) {
+      if (!confirm('Delete this expense?')) return;
+      const { error } = await sb.from('expenses').delete().eq('id', id);
+      if (error) return toast(error.message, 'error');
+      toast('Deleted', 'success');
+      await loadExpenses();
+    }
+
+    function exportCSV() {
+      if (!allExpenses.length) return toast('No data to export', 'error');
+      const rows = [['Date', 'Description', 'Category', 'Amount']];
+      allExpenses.forEach(e => rows.push([
+        e.expense_date,
+        (e.description || '').replace(/"/g, '""'),
+        e.categories?.name || 'Other',
+        e.amount
+      ]));
+      const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `expenses-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('CSV downloaded', 'success');
+    }
+
+    window.deleteExpense = deleteExpense;
+    window.exportCSV = exportCSV;
+    init();
+  </script>
+</body>
+</html>
