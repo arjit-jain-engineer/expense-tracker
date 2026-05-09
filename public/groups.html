@@ -66,6 +66,7 @@
       <div class="px-6 py-12 text-center text-stone-400 col-span-full">Loading...</div>
     </div>
   </main>
+
   <div id="profile-modal" class="modal-backdrop hidden">
     <div class="modal-content max-w-md w-full rounded-[28px] border border-white/60 shadow-2xl p-0 overflow-hidden bg-white">
       <div class="px-6 py-5 border-b border-stone-100 bg-gradient-to-b from-white to-stone-50/70">
@@ -82,7 +83,6 @@
           </button>
         </div>
       </div>
-
       <div class="px-6 py-6">
         <div class="flex items-center gap-4">
           <div id="profile-avatar" class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 text-white flex items-center justify-center font-bold text-xl shadow-lg overflow-hidden ring-4 ring-white"></div>
@@ -91,13 +91,11 @@
             <p id="profile-email" class="text-stone-500 text-sm mt-1 truncate"></p>
           </div>
         </div>
-
         <div class="mt-6 space-y-3">
           <div class="rounded-2xl bg-stone-50 border border-stone-100 px-4 py-4">
             <p class="text-xs uppercase tracking-[0.18em] text-stone-400 mb-1">Status</p>
             <p class="font-medium text-stone-900">Signed in</p>
           </div>
-
           <div class="rounded-2xl bg-stone-50 border border-stone-100 px-4 py-4">
             <p class="text-xs uppercase tracking-[0.18em] text-stone-400 mb-3">Actions</p>
             <button onclick="logout()" class="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 transition shadow-sm">
@@ -111,7 +109,6 @@
           </div>
         </div>
       </div>
-
       <div class="px-6 py-5 border-t border-stone-100 bg-stone-50/80 flex justify-end">
         <button onclick="closeModal('profile-modal')" class="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100 transition">
           Close
@@ -119,6 +116,7 @@
       </div>
     </div>
   </div>
+
   <div id="create-group-modal" class="modal-backdrop hidden">
     <div class="modal-content">
       <h3 class="font-display text-2xl font-semibold mb-1">Create group</h3>
@@ -126,11 +124,11 @@
       <div class="space-y-4">
         <div>
           <label>Group name</label>
-          <input id="group-name" class="input" placeholder="Goa Trip 2025" />
+          <input id="new-group-name" class="input" placeholder="Goa Trip 2025" />
         </div>
         <div>
           <label>Description (optional)</label>
-          <input id="group-desc" class="input" placeholder="3-day weekend trip" />
+          <input id="new-group-desc" class="input" placeholder="3-day weekend trip" />
         </div>
       </div>
       <div class="flex gap-3 mt-6">
@@ -150,11 +148,8 @@
       try {
         me = await requireAuth();
         if (!me) return;
-
         await renderUserNav();
-
         document.getElementById('save-group-btn').addEventListener('click', createGroup);
-
         await loadGroups();
       } catch (err) {
         console.error('init error:', err);
@@ -230,12 +225,12 @@
     async function calculateMyBalanceInGroup(groupId) {
       try {
         const [
-          { data: expenses, error: expErr },
+          { data: groupExpenses, error: expErr },
           { data: splits, error: splitErr },
           { data: settlements, error: settleErr }
         ] = await Promise.all([
           sb.from('group_expenses')
-            .select('amount, paid_by')
+            .select('id, amount, paid_by')
             .eq('group_id', groupId),
 
           sb.from('expense_splits')
@@ -248,42 +243,28 @@
             .eq('group_id', groupId)
         ]);
 
-        if (expErr) {
-          console.error('calculate balance expenses error:', expErr);
-          toast(expErr.message, 'error');
-          return 0;
-        }
+        if (expErr) throw expErr;
+        if (splitErr) throw splitErr;
+        if (settleErr) throw settleErr;
 
-        if (splitErr) {
-          console.error('calculate balance splits error:', splitErr);
-          toast(splitErr.message, 'error');
-          return 0;
-        }
-
-        if (settleErr) {
-          console.error('calculate balance settlements error:', settleErr);
-          toast(settleErr.message, 'error');
-          return 0;
-        }
-
-        const paidByMe = (expenses || [])
+        const paidByMe = (groupExpenses || [])
           .filter(e => e.paid_by === me.id)
-          .reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+          .reduce((s, e) => s + Number(e.amount || 0), 0);
 
         const myShare = (splits || [])
-          .reduce((s, x) => s + parseFloat(x.share_amount || 0), 0);
+          .reduce((s, x) => s + Number(x.share_amount || 0), 0);
 
-        const paidToMe = (settlements || [])
+        const received = (settlements || [])
           .filter(s => s.to_user === me.id)
-          .reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+          .reduce((s, x) => s + Number(x.amount || 0), 0);
 
-        const paidByMeAsSettle = (settlements || [])
+        const sent = (settlements || [])
           .filter(s => s.from_user === me.id)
-          .reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+          .reduce((s, x) => s + Number(x.amount || 0), 0);
 
-        return (paidByMe - myShare) + (paidByMeAsSettle - paidToMe);
+        return (paidByMe - myShare) + (sent - received);
       } catch (err) {
-        console.error('calculateMyBalanceInGroup fatal error:', err);
+        console.error('calculateMyBalanceInGroup error:', err);
         return 0;
       }
     }
@@ -305,18 +286,9 @@
 
       grid.innerHTML = groups.map((g, i) => {
         const bal = g.balance || 0;
-        const balText =
-          bal === 0
-            ? 'Settled up'
-            : (bal > 0 ? `You're owed ${fmtCurrency(bal)}` : `You owe ${fmtCurrency(-bal)}`);
-
-        const balColor =
-          bal === 0
-            ? 'text-stone-500'
-            : (bal > 0 ? 'text-emerald-600' : 'text-rose-600');
-
+        const balText = bal === 0 ? 'Settled up' : (bal > 0 ? `You\'re owed ${fmtCurrency(bal)}` : `You owe ${fmtCurrency(-bal)}`);
+        const balColor = bal === 0 ? 'text-stone-500' : (bal > 0 ? 'text-emerald-600' : 'text-rose-600');
         const initial = (g.name || '?')[0].toUpperCase();
-
         const gradients = [
           'from-amber-400 to-rose-500',
           'from-blue-400 to-indigo-500',
@@ -325,7 +297,6 @@
           'from-orange-400 to-red-500',
           'from-cyan-400 to-blue-500'
         ];
-
         const grad = gradients[i % gradients.length];
 
         return `
@@ -345,8 +316,8 @@
     }
 
     async function createGroup() {
-      const name = document.getElementById('group-name').value.trim();
-      const description = document.getElementById('group-desc').value.trim();
+      const name = document.getElementById('new-group-name').value.trim();
+      const description = document.getElementById('new-group-desc').value.trim();
       const btn = document.getElementById('save-group-btn');
 
       if (!name) return toast('Group ka naam daal', 'error');
@@ -387,8 +358,8 @@
 
       toast('Group created!', 'success');
       closeModal('create-group-modal');
-      document.getElementById('group-name').value = '';
-      document.getElementById('group-desc').value = '';
+      document.getElementById('new-group-name').value = '';
+      document.getElementById('new-group-desc').value = '';
       window.location.href = `group.html?id=${group.id}`;
     }
 

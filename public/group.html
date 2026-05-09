@@ -52,7 +52,7 @@
       </div>
     </div>
 
-    <div class="flex gap-1 mb-6 border-b border-stone-200">
+    <div class="flex gap-1 mb-6 border-b border-stone-200 overflow-x-auto">
       <button class="tab-btn px-4 py-2 font-medium text-sm border-b-2 border-stone-900" data-tab="expenses">Expenses</button>
       <button class="tab-btn px-4 py-2 font-medium text-sm border-b-2 border-transparent text-stone-500" data-tab="balances">Balances</button>
       <button class="tab-btn px-4 py-2 font-medium text-sm border-b-2 border-transparent text-stone-500" data-tab="members">Members</button>
@@ -92,6 +92,7 @@
       </div>
     </div>
   </main>
+
   <div id="profile-modal" class="modal-backdrop hidden">
     <div class="modal-content max-w-md w-full rounded-[28px] border border-white/60 shadow-2xl p-0 overflow-hidden bg-white">
       <div class="px-6 py-5 border-b border-stone-100 bg-gradient-to-b from-white to-stone-50/70">
@@ -101,14 +102,10 @@
             <h3 class="font-display text-2xl font-semibold text-stone-900">Profile</h3>
           </div>
           <button onclick="closeModal('profile-modal')" class="w-9 h-9 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 transition flex items-center justify-center" aria-label="Close">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
       </div>
-
       <div class="px-6 py-6">
         <div class="flex items-center gap-4">
           <div id="profile-avatar" class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 text-white flex items-center justify-center font-bold text-xl shadow-lg overflow-hidden ring-4 ring-white"></div>
@@ -117,27 +114,20 @@
             <p id="profile-email" class="text-stone-500 text-sm mt-1 truncate"></p>
           </div>
         </div>
-
         <div class="mt-6 space-y-3">
           <div class="rounded-2xl bg-stone-50 border border-stone-100 px-4 py-4">
             <p class="text-xs uppercase tracking-[0.18em] text-stone-400 mb-1">Status</p>
             <p class="font-medium text-stone-900">Signed in</p>
           </div>
-
           <div class="rounded-2xl bg-stone-50 border border-stone-100 px-4 py-4">
             <p class="text-xs uppercase tracking-[0.18em] text-stone-400 mb-3">Actions</p>
             <button onclick="logout()" class="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 transition shadow-sm">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                <polyline points="16 17 21 12 16 7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               Logout
             </button>
           </div>
         </div>
       </div>
-
       <div class="px-6 py-5 border-t border-stone-100 bg-stone-50/80 flex justify-end">
         <button onclick="closeModal('profile-modal')" class="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100 transition">
           Close
@@ -145,6 +135,7 @@
       </div>
     </div>
   </div>
+
   <div id="split-modal" class="modal-backdrop hidden">
     <div class="modal-content">
       <h3 class="font-display text-2xl font-semibold mb-1">Add group expense</h3>
@@ -163,6 +154,10 @@
         <div>
           <label>Description</label>
           <input id="split-desc" class="input" placeholder="Dinner at Cafe" />
+        </div>
+        <div>
+          <label>Category</label>
+          <select id="split-category" class="input"></select>
         </div>
         <div>
           <label>Paid by</label>
@@ -209,8 +204,12 @@
   <div id="settle-modal" class="modal-backdrop hidden">
     <div class="modal-content">
       <h3 class="font-display text-2xl font-semibold mb-1">Settle up</h3>
-      <p class="text-stone-500 text-sm mb-5">Record a payment between members</p>
+      <p class="text-stone-500 text-sm mb-5">Record a payment between members and link it to a group expense</p>
       <div class="space-y-4">
+        <div>
+          <label>Related group expense</label>
+          <select id="settle-expense-id" class="input"></select>
+        </div>
         <div>
           <label>From (who is paying)</label>
           <select id="settle-from" class="input"></select>
@@ -244,6 +243,7 @@
     let members = [];
     let expenses = [];
     let settlements = [];
+    let categories = [];
     let splitType = 'equal';
     let selectedMembers = new Set();
 
@@ -251,14 +251,15 @@
       try {
         me = await requireAuth();
         if (!me) return;
-
         await renderUserNav();
-
         groupId = new URLSearchParams(window.location.search).get('id');
         if (!groupId) return window.location.href = 'groups.html';
-
-        document.getElementById('split-date').valueAsDate = new Date();
-
+        const today = new Date();
+        const localDate = today.getFullYear() + '-' + 
+          String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+          String(today.getDate()).padStart(2, '0');
+        document.getElementById('split-date').value = localDate;
+        await loadCategories();
         await loadAll();
 
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -284,9 +285,12 @@
             btn.classList.remove('btn-ghost');
             btn.classList.add('btn-primary');
             renderSplitMembers();
+            updateSplitSummary();
           });
         });
 
+        document.getElementById('settle-expense-id').addEventListener('change', autoFillSettlementFromExpense);
+        document.getElementById('settle-from').addEventListener('change', filterSettlementExpenseOptions);
         document.querySelector('[data-type="equal"]').click();
         document.getElementById('split-amount').addEventListener('input', updateSplitSummary);
         document.getElementById('save-split-btn').addEventListener('click', saveSplit);
@@ -295,6 +299,22 @@
       } catch (err) {
         console.error('init error:', err);
         toast(`Init failed: ${err.message}`, 'error');
+      }
+    }
+
+    async function loadCategories() {
+      const sel = document.getElementById('split-category');
+      sel.innerHTML = '<option value="">Loading categories...</option>';
+      try {
+        categories = await fetchMyCategories();
+        sel.innerHTML = categories.length
+          ? `<option value="">Select category</option>` + categories.map(c => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('')
+          : '<option value="">No categories found</option>';
+        if (categories[0]) sel.value = categories[0].id;
+      } catch (err) {
+        console.error('loadCategories error:', err);
+        categories = [];
+        sel.innerHTML = '<option value="">Failed to load categories</option>';
       }
     }
 
@@ -312,10 +332,7 @@
       document.getElementById('group-desc').textContent = g.description || '';
       document.getElementById('group-avatar').textContent = g.name[0].toUpperCase();
 
-      const { data: m, error: membersError } = await sb.from('group_members')
-        .select('user_id, profiles(*)')
-        .eq('group_id', groupId);
-
+      const { data: m, error: membersError } = await sb.from('group_members').select('user_id, profiles(*)').eq('group_id', groupId);
       if (membersError) {
         console.error('members load error:', membersError);
         toast(membersError.message, 'error');
@@ -325,11 +342,10 @@
       }
 
       const { data: e, error: expensesError } = await sb.from('group_expenses')
-        .select('*, expense_splits(*, profiles(*)), payer:profiles!group_expenses_paid_by_fkey(*)')
+        .select('*, expense_splits(*, profiles(*)), payer:profiles!group_expenses_paid_by_fkey(*), categories(*)')
         .eq('group_id', groupId)
         .order('expense_date', { ascending: false })
         .order('created_at', { ascending: false });
-
       if (expensesError) {
         console.error('expenses load error:', expensesError);
         toast(expensesError.message, 'error');
@@ -339,10 +355,9 @@
       }
 
       const { data: s, error: settlementsError } = await sb.from('settlements')
-        .select('*, from_profile:profiles!settlements_from_user_fkey(*), to_profile:profiles!settlements_to_user_fkey(*)')
+        .select('*, from_profile:profiles!settlements_from_user_fkey(*), to_profile:profiles!settlements_to_user_fkey(*), group_expense:group_expenses(id, description, amount)')
         .eq('group_id', groupId)
         .order('settled_at', { ascending: false });
-
       if (settlementsError) {
         console.error('settlements load error:', settlementsError);
         toast(settlementsError.message, 'error');
@@ -359,14 +374,54 @@
     }
 
     function populateSelects() {
-      if (!members.length) return;
+      const splitPaidBy = document.getElementById('split-paidby');
+      const settleFrom = document.getElementById('settle-from');
+      const settleTo = document.getElementById('settle-to');
+      const settleExpense = document.getElementById('settle-expense-id');
+
+      if (!members.length) {
+        splitPaidBy.innerHTML = '<option value="">No members</option>';
+        settleFrom.innerHTML = '<option value="">No members</option>';
+        settleTo.innerHTML = '<option value="">No members</option>';
+        settleExpense.innerHTML = '<option value="">No expenses</option>';
+        return;
+      }
 
       const opts = members.map(m => `<option value="${m.id}">${m.full_name || m.email}${m.id === me.id ? ' (you)' : ''}</option>`).join('');
-      document.getElementById('split-paidby').innerHTML = opts;
-      document.getElementById('split-paidby').value = me.id;
-      document.getElementById('settle-from').innerHTML = opts;
-      document.getElementById('settle-to').innerHTML = opts;
-      document.getElementById('settle-from').value = me.id;
+      splitPaidBy.innerHTML = opts;
+      splitPaidBy.value = me.id;
+      settleFrom.innerHTML = opts;
+      settleTo.innerHTML = opts;
+      settleFrom.value = me.id;
+      const defaultTo = members.find(m => m.id !== me.id);
+      if (defaultTo) settleTo.value = defaultTo.id;
+      filterSettlementExpenseOptions();
+    }
+
+    function filterSettlementExpenseOptions() {
+      const settleExpense = document.getElementById('settle-expense-id');
+      const selectedPayer = document.getElementById('settle-from').value;
+      const filteredExpenses = expenses;
+      settleExpense.innerHTML = filteredExpenses.length
+        ? filteredExpenses.map(e => `<option value="${e.id}">${e.description || 'Untitled'} · ${fmtCurrency(getExpenseDisplayAmount(e))}</option>`).join('')
+        : '<option value="">No matching expenses</option>';
+      if (filteredExpenses[0]) settleExpense.value = filteredExpenses[0].id;
+      autoFillSettlementFromExpense();
+    }
+
+    function autoFillSettlementFromExpense() {
+      const expenseId = document.getElementById('settle-expense-id').value;
+      const expense = expenses.find(e => e.id === expenseId);
+      if (!expense) return;
+      document.getElementById('settle-to').value = expense.paid_by;
+      const myShare = (expense.expense_splits || []).find(s => s.user_id === me.id);
+      if (myShare && !document.getElementById('settle-amount').value) {
+        document.getElementById('settle-amount').value = Number(myShare.share_amount || 0).toFixed(2);
+      }
+      if (document.getElementById('settle-from').value === expense.paid_by) {
+        const alternate = members.find(m => m.id !== expense.paid_by);
+        if (alternate) document.getElementById('settle-from').value = alternate.id;
+      }
     }
 
     function renderMembers() {
@@ -375,7 +430,6 @@
         el.innerHTML = `<div class="px-6 py-12 text-center text-stone-400">No members found</div>`;
         return;
       }
-
       el.innerHTML = members.map(m => `
         <div class="px-6 py-4 flex items-center gap-4">
           <div class="w-11 h-11 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center text-white font-bold">
@@ -393,34 +447,34 @@
     function renderExpenses() {
       const list = document.getElementById('expenses-list');
       if (!expenses.length) {
-        list.innerHTML = `<div class="px-6 py-16 text-center text-stone-400">
-          <p class="text-lg">No expenses yet</p>
-          <p class="text-sm mt-1">Add the first one to get started</p>
-        </div>`;
+        list.innerHTML = `<div class="px-6 py-16 text-center text-stone-400"><p class="text-lg">No expenses yet</p><p class="text-sm mt-1">Add the first one to get started</p></div>`;
         return;
       }
-
       list.innerHTML = expenses.map(e => {
         const myShare = (e.expense_splits || []).find(s => s.user_id === me.id);
         const myShareText = myShare ? `Your share: ${fmtCurrency(myShare.share_amount)}` : 'Not in split';
         const paidByMe = e.paid_by === me.id;
-
+        const displayAmount = fmtCurrency(getExpenseDisplayAmount(e));
+        const isGroupAuto = !!e.is_auto_generated;
+        const meta = e.is_group_payment ? `Group payment${e.reimbursed_amount ? ` · Reimbursed ${fmtCurrency(e.reimbursed_amount)}` : ''}` : '';
+        const cat = e.categories;
+        const iconBg = cat?.color ? `${cat.color}20` : '#fef3c7';
         return `
           <div class="px-6 py-4 flex items-center gap-4 hover:bg-stone-50 transition">
-            <div class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center text-xl">💸</div>
+            <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl" style="background:${iconBg};">${cat?.icon || '💸'}</div>
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-stone-800">${e.description || 'Untitled expense'}</p>
-              <p class="text-xs text-stone-500">
-                ${paidByMe ? '<span class="text-emerald-700 font-medium">You</span>' : (e.payer?.full_name || 'Someone')} paid · ${fmtDate(e.expense_date)}
-              </p>
+              <div class="flex items-center gap-2 flex-wrap">
+                <p class="font-medium text-stone-800">${e.description || 'Untitled expense'}</p>
+                ${e.is_group_payment ? '<span class="text-[11px] px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-medium">Group payment</span>' : ''}
+              </div>
+              <p class="text-xs text-stone-500">${paidByMe ? '<span class="text-emerald-700 font-medium">You</span>' : (e.payer?.full_name || 'Someone')} paid · ${fmtDate(e.expense_date)} · ${fmtDate(e.created_at, true).split(' · ').pop()}${cat?.name ? ` · ${cat.name}` : ''}</p>
+              ${meta ? `<p class="text-xs text-stone-500 mt-1">${meta}</p>` : ''}
             </div>
             <div class="text-right">
-              <p class="font-display text-lg font-semibold">${fmtCurrency(e.amount)}</p>
+              <p class="font-display text-lg font-semibold">${displayAmount}</p>
               <p class="text-xs text-stone-500">${myShareText}</p>
             </div>
-            ${paidByMe ? `<button onclick="deleteGroupExpense('${e.id}')" class="text-stone-400 hover:text-rose-600 p-2" title="Delete">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
-            </button>` : ''}
+            ${(paidByMe || (group && me.id === group.created_by)) && !isGroupAuto ? '<button onclick="deleteGroupExpense(\'' + e.id + '\')" class="text-stone-400 hover:text-rose-600 p-2" title="Delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg></button>' : ''}
           </div>
         `;
       }).join('');
@@ -429,36 +483,30 @@
     function calculateBalances() {
       const balances = {};
       members.forEach(m => balances[m.id] = 0);
-
       expenses.forEach(e => {
-        balances[e.paid_by] = (balances[e.paid_by] || 0) + parseFloat(e.amount || 0);
+        balances[e.paid_by] = (balances[e.paid_by] || 0) + getExpenseDisplayAmount(e);
         (e.expense_splits || []).forEach(s => {
           balances[s.user_id] = (balances[s.user_id] || 0) - parseFloat(s.share_amount || 0);
         });
       });
-
       settlements.forEach(s => {
         balances[s.from_user] = (balances[s.from_user] || 0) + parseFloat(s.amount || 0);
         balances[s.to_user] = (balances[s.to_user] || 0) - parseFloat(s.amount || 0);
       });
-
       return balances;
     }
 
     function simplifyDebts(balances) {
       const creditors = [];
       const debtors = [];
-
       Object.entries(balances).forEach(([uid, bal]) => {
         const member = members.find(m => m.id === uid);
         if (!member) return;
         if (bal > 0.01) creditors.push({ ...member, amount: bal });
         else if (bal < -0.01) debtors.push({ ...member, amount: -bal });
       });
-
       creditors.sort((a, b) => b.amount - a.amount);
       debtors.sort((a, b) => b.amount - a.amount);
-
       const transfers = [];
       let i = 0, j = 0;
       while (i < debtors.length && j < creditors.length) {
@@ -474,7 +522,6 @@
 
     function renderBalances() {
       const balances = calculateBalances();
-
       const balList = document.getElementById('balances-list');
       if (!members.length) {
         balList.innerHTML = '<p class="text-stone-400 text-center py-4">No members found</p>';
@@ -485,16 +532,13 @@
           const text = Math.abs(b) < 0.01 ? 'Settled' : (b > 0 ? `Gets back ${fmtCurrency(b)}` : `Owes ${fmtCurrency(-b)}`);
           return `
             <div class="flex items-center gap-3 py-2">
-              <div class="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center text-white font-bold text-sm">
-                ${(m.full_name || m.email)[0].toUpperCase()}
-              </div>
+              <div class="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center text-white font-bold text-sm">${(m.full_name || m.email)[0].toUpperCase()}</div>
               <span class="flex-1 text-stone-700">${m.full_name || m.email}${m.id === me.id ? ' (you)' : ''}</span>
               <span class="${color} font-medium">${text}</span>
             </div>
           `;
         }).join('');
       }
-
       const transfers = simplifyDebts(balances);
       const sumEl = document.getElementById('settlements-summary');
       if (!transfers.length) {
@@ -517,17 +561,12 @@
         list.innerHTML = '<div class="px-6 py-12 text-center text-stone-400">No settlements yet</div>';
         return;
       }
-
       list.innerHTML = settlements.map(s => `
         <div class="px-6 py-4 flex items-center gap-4">
           <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">✓</div>
           <div class="flex-1">
-            <p class="text-stone-800">
-              <span class="font-medium">${s.from_profile?.full_name || s.from_profile?.email}</span>
-              paid
-              <span class="font-medium">${s.to_profile?.full_name || s.to_profile?.email}</span>
-            </p>
-            <p class="text-xs text-stone-500">${fmtDate(s.settled_at)}${s.note ? ' · ' + s.note : ''}</p>
+            <p class="text-stone-800"><span class="font-medium">${s.from_profile?.full_name || s.from_profile?.email}</span> paid <span class="font-medium">${s.to_profile?.full_name || s.to_profile?.email}</span></p>
+            <p class="text-xs text-stone-500">${fmtDate(s.settled_at)}${s.group_expense?.description ? ` · Against ${s.group_expense.description}` : ''}${s.note ? ' · ' + s.note : ''}</p>
           </div>
           <p class="font-display text-lg font-semibold">${fmtCurrency(s.amount)}</p>
         </div>
@@ -546,7 +585,6 @@
       const total = parseFloat(document.getElementById('split-amount').value) || 0;
       const equalShare = selectedMembers.size > 0 ? (total / selectedMembers.size) : 0;
       const isExact = splitType === 'exact';
-
       const box = document.getElementById('split-members');
       box.innerHTML = members.map(m => {
         const checked = selectedMembers.has(m.id);
@@ -554,19 +592,11 @@
           <div class="flex items-center gap-3 p-2 rounded-lg ${checked ? 'bg-amber-50' : 'bg-stone-50'}">
             <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleMember('${m.id}', this.checked)" class="w-4 h-4 accent-amber-600" />
             <span class="flex-1 text-sm">${m.full_name || m.email}${m.id === me.id ? ' (you)' : ''}</span>
-            ${checked ? (isExact
-              ? `<input type="number" step="0.01" data-uid="${m.id}" class="exact-input w-24 input py-1 text-right" placeholder="0.00" />`
-              : `<span class="text-sm text-stone-600 font-medium">${fmtCurrency(equalShare)}</span>`
-            ) : ''}
+            ${checked ? (isExact ? `<input type="number" step="0.01" data-uid="${m.id}" class="exact-input w-24 input py-1 text-right" placeholder="0.00" />` : `<span class="text-sm text-stone-600 font-medium">${fmtCurrency(equalShare)}</span>`) : ''}
           </div>
         `;
       }).join('');
-
-      if (isExact) {
-        document.querySelectorAll('.exact-input').forEach(inp => {
-          inp.addEventListener('input', updateSplitSummary);
-        });
-      }
+      if (isExact) document.querySelectorAll('.exact-input').forEach(inp => inp.addEventListener('input', updateSplitSummary));
     }
 
     function toggleMember(uid, on) {
@@ -580,18 +610,12 @@
       const total = parseFloat(document.getElementById('split-amount').value) || 0;
       const isExact = splitType === 'exact';
       const sum = document.getElementById('split-summary');
-
       if (isExact) {
         let exactSum = 0;
-        document.querySelectorAll('.exact-input').forEach(inp => {
-          exactSum += parseFloat(inp.value) || 0;
-        });
+        document.querySelectorAll('.exact-input').forEach(inp => exactSum += parseFloat(inp.value) || 0);
         const diff = total - exactSum;
-        if (Math.abs(diff) < 0.01 && total > 0) {
-          sum.innerHTML = `<span class="text-emerald-600">✓ Splits add up to ${fmtCurrency(total)}</span>`;
-        } else {
-          sum.innerHTML = `Total: ${fmtCurrency(total)} · Splits sum: ${fmtCurrency(exactSum)} · <span class="${diff > 0 ? 'text-amber-600' : 'text-rose-600'}">${diff > 0 ? 'Short by' : 'Over by'} ${fmtCurrency(Math.abs(diff))}</span>`;
-        }
+        if (Math.abs(diff) < 0.01 && total > 0) sum.innerHTML = `<span class="text-emerald-600">✓ Splits add up to ${fmtCurrency(total)}</span>`;
+        else sum.innerHTML = `Total: ${fmtCurrency(total)} · Splits sum: ${fmtCurrency(exactSum)} · <span class="${diff > 0 ? 'text-amber-600' : 'text-rose-600'}">${diff > 0 ? 'Short by' : 'Over by'} ${fmtCurrency(Math.abs(diff))}</span>`;
       } else {
         const share = selectedMembers.size > 0 ? total / selectedMembers.size : 0;
         sum.innerHTML = `Each pays ${fmtCurrency(share)} (${selectedMembers.size} members)`;
@@ -602,109 +626,75 @@
     async function saveSplit() {
       const amount = parseFloat(document.getElementById('split-amount').value);
       const description = document.getElementById('split-desc').value.trim();
+      const category_id = document.getElementById('split-category').value || null;
       const paid_by = document.getElementById('split-paidby').value;
       const expense_date = document.getElementById('split-date').value;
       const btn = document.getElementById('save-split-btn');
-
       if (!amount || amount <= 0) return toast('Valid amount daal', 'error');
       if (!description) return toast('Description daal', 'error');
+      if (!category_id) return toast('Category select karo', 'error');
       if (selectedMembers.size === 0) return toast('Kam se kam ek member select kr', 'error');
-
       btn.disabled = true;
       btn.textContent = 'Saving...';
-
-      let splits = [];
-      if (splitType === 'equal') {
-        const share = +(amount / selectedMembers.size).toFixed(2);
-        const total = share * selectedMembers.size;
-        const diff = +(amount - total).toFixed(2);
-        const ids = Array.from(selectedMembers);
-        splits = ids.map((uid, i) => ({
-          user_id: uid,
-          share_amount: i === 0 ? +(share + diff).toFixed(2) : share
-        }));
-      } else {
-        let sum = 0;
-        document.querySelectorAll('.exact-input').forEach(inp => {
-          const v = parseFloat(inp.value) || 0;
-          if (v > 0) splits.push({ user_id: inp.dataset.uid, share_amount: v });
-          sum += v;
-        });
-        if (Math.abs(sum - amount) > 0.01) {
-          btn.disabled = false;
-          btn.textContent = 'Save expense';
-          return toast(`Splits ka total ${fmtCurrency(amount)} hona chahiye`, 'error');
+      try {
+        let splits = [];
+        if (splitType === 'equal') {
+          const share = +(amount / selectedMembers.size).toFixed(2);
+          const total = share * selectedMembers.size;
+          const diff = +(amount - total).toFixed(2);
+          const ids = Array.from(selectedMembers);
+          splits = ids.map((uid, i) => ({ user_id: uid, share_amount: i === 0 ? +(share + diff).toFixed(2) : share }));
+        } else {
+          let sum = 0;
+          document.querySelectorAll('.exact-input').forEach(inp => {
+            const v = parseFloat(inp.value) || 0;
+            if (v > 0) splits.push({ user_id: inp.dataset.uid, share_amount: v });
+            sum += v;
+          });
+          if (Math.abs(sum - amount) > 0.01) throw new Error(`Splits ka total ${fmtCurrency(amount)} hona chahiye`);
         }
-      }
-
-      const { data: exp, error } = await sb.from('group_expenses')
-        .insert({ group_id: groupId, paid_by, amount, description, expense_date })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('group_expenses insert error:', error);
+        const { data: exp, error } = await sb.from('group_expenses').insert({ group_id: groupId, paid_by, category_id, amount, description, expense_date }).select().single();
+        if (error) throw error;
+        const { error: splitErr } = await sb.from('expense_splits').insert(splits.map(s => ({ ...s, group_expense_id: exp.id })));
+        if (splitErr) throw splitErr;
+        toast('Expense added!', 'success');
+        closeModal('split-modal');
+        document.getElementById('split-amount').value = '';
+        document.getElementById('split-desc').value = '';
+        if (categories[0]) document.getElementById('split-category').value = categories[0].id;
+        await loadAll();
+      } catch (err) {
+        console.error('saveSplit error:', err);
+        toast(err.message, 'error');
+      } finally {
         btn.disabled = false;
         btn.textContent = 'Save expense';
-        return toast(error.message, 'error');
       }
-
-      const { error: splitErr } = await sb.from('expense_splits')
-        .insert(splits.map(s => ({ ...s, group_expense_id: exp.id })));
-
-      btn.disabled = false;
-      btn.textContent = 'Save expense';
-
-      if (splitErr) {
-        console.error('expense_splits insert error:', splitErr);
-        return toast(splitErr.message, 'error');
-      }
-
-      toast('Expense added!', 'success');
-      closeModal('split-modal');
-      document.getElementById('split-amount').value = '';
-      document.getElementById('split-desc').value = '';
-      await loadAll();
     }
 
     async function addMember() {
       const email = document.getElementById('member-email').value.trim().toLowerCase();
       const btn = document.getElementById('save-member-btn');
       if (!email) return toast('Email daal', 'error');
-
       btn.disabled = true;
       btn.textContent = 'Adding...';
-
-      const { data: profile, error } = await sb.from('profiles').select('id').eq('email', email).maybeSingle();
-      if (error) {
-        console.error('addMember profile lookup error:', error);
+      try {
+        const { data: profile, error } = await sb.from('profiles').select('id').eq('email', email).maybeSingle();
+        if (error) throw error;
+        if (!profile) throw new Error('User not found. Unhe pehle signup krna padega.');
+        const { error: insertErr } = await sb.from('group_members').insert({ group_id: groupId, user_id: profile.id });
+        if (insertErr) throw insertErr;
+        toast('Member added!', 'success');
+        closeModal('add-member-modal');
+        document.getElementById('member-email').value = '';
+        await loadAll();
+      } catch (err) {
+        console.error('addMember error:', err);
+        toast(err.message, 'error');
+      } finally {
         btn.disabled = false;
         btn.textContent = 'Add member';
-        return toast(error.message, 'error');
       }
-
-      if (!profile) {
-        btn.disabled = false;
-        btn.textContent = 'Add member';
-        return toast('User not found. Unhe pehle signup krna padega.', 'error');
-      }
-
-      const { error: insertErr } = await sb.from('group_members')
-        .insert({ group_id: groupId, user_id: profile.id });
-
-      btn.disabled = false;
-      btn.textContent = 'Add member';
-
-      if (insertErr) {
-        console.error('addMember insert error:', insertErr);
-        if (insertErr.code === '23505') return toast('Already a member', 'error');
-        return toast(insertErr.message, 'error');
-      }
-
-      toast('Member added!', 'success');
-      closeModal('add-member-modal');
-      document.getElementById('member-email').value = '';
-      await loadAll();
     }
 
     async function saveSettlement() {
@@ -712,41 +702,41 @@
       const to_user = document.getElementById('settle-to').value;
       const amount = parseFloat(document.getElementById('settle-amount').value);
       const note = document.getElementById('settle-note').value.trim();
+      const group_expense_id = document.getElementById('settle-expense-id').value || null;
       const btn = document.getElementById('save-settle-btn');
-
+      if (!group_expense_id) return toast('Related group expense select karo', 'error');
       if (!amount || amount <= 0) return toast('Valid amount daal', 'error');
       if (from_user === to_user) return toast('From and To same nhi ho sakte', 'error');
-
       btn.disabled = true;
       btn.textContent = 'Saving...';
-
-      const { error } = await sb.from('settlements')
-        .insert({ group_id: groupId, from_user, to_user, amount, note });
-
-      btn.disabled = false;
-      btn.textContent = 'Record payment';
-
-      if (error) {
-        console.error('saveSettlement error:', error);
-        return toast(error.message, 'error');
+      try {
+        const { error } = await sb.from('settlements').insert({ group_id: groupId, group_expense_id, from_user, to_user, amount, note });
+        if (error) throw error;
+        toast('Settlement recorded!', 'success');
+        closeModal('settle-modal');
+        document.getElementById('settle-amount').value = '';
+        document.getElementById('settle-note').value = '';
+        await loadAll();
+      } catch (err) {
+        console.error('saveSettlement error:', err);
+        toast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Record payment';
       }
-
-      toast('Settlement recorded!', 'success');
-      closeModal('settle-modal');
-      document.getElementById('settle-amount').value = '';
-      document.getElementById('settle-note').value = '';
-      await loadAll();
     }
 
     async function deleteGroupExpense(id) {
       if (!confirm('Delete this expense? Splits bhi delete ho jayenge.')) return;
-      const { error } = await sb.from('group_expenses').delete().eq('id', id);
-      if (error) {
-        console.error('deleteGroupExpense error:', error);
-        return toast(error.message, 'error');
+      try {
+        const { error } = await sb.from('group_expenses').delete().eq('id', id);
+        if (error) throw error;
+        toast('Deleted', 'success');
+        await loadAll();
+      } catch (err) {
+        console.error('deleteGroupExpense error:', err);
+        toast(err.message, 'error');
       }
-      toast('Deleted', 'success');
-      await loadAll();
     }
 
     window.toggleMember = toggleMember;
